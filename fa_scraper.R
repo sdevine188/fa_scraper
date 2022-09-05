@@ -10,7 +10,8 @@ library(rvest)
 # setwd
 setwd("C:/Users/Stephen/Desktop/R/fa_scraper")
 
-# manually login and get current_issue_url (note the url will have "check_logged_in=1" annotation)
+# manually login and get current_issue_url by clicking "Current Issue" tab in header 
+# (note the url will have "check_logged_in=1" annotation)
 current_issue_url <- "https://www.foreignaffairs.com/issues/2022/101/4?check_logged_in=1"
 
 # create get_article_text()
@@ -19,30 +20,12 @@ get_article_text <- function(current_issue_url) {
         # get current_issue_html
         current_issue_html <- read_html(x = "https://www.foreignaffairs.com/issues/2022/101/4?check_logged_in=1")
         
-        # get article_titles
-        article_titles <- current_issue_html %>% html_nodes(css = "[href]") %>% html_text() %>% as_tibble() %>% 
-                rename(href_text = value) %>%
-                mutate(row_number = row_number(),
-                       footer_begins_row = case_when(str_detect(string = href_text, 
-                                                                pattern = regex("Contact Us", ignore_case = TRUE)) ~ row_number)) %>%
-                fill(footer_begins_row, .direction = "updown") %>%
-                mutate(article_flag = case_when(href_text == "" ~ 0,
-                                                href_text == "Sign in" ~ 0,
-                                                href_text == "Subscribe" ~ 0,
-                                                str_detect(string = href_text, pattern = regex("^\n", ignore_case = TRUE)) ~ 0,
-                                                row_number > footer_begins_row ~ 0,
-                                                TRUE ~ 1)) %>%
-                filter(article_flag == 1) 
-        
         # get article_links
-        article_links <- map(.x = article_titles %>% pull(row_number), 
-                             .f = ~ current_issue_html %>% html_nodes(css = "[href]") %>% .[[.x]] %>% html_attr("href")) %>%
-                enframe() %>% unnest(cols = value) %>%
-                rename(url = value) %>%
+        article_links <- current_issue_html %>% html_nodes(css = "[href]") %>% html_attr("href") %>% 
+                tibble(url = .) %>%
                 filter(str_detect(string = url, pattern = regex("^/articles", ignore_case = TRUE))) %>%
                 mutate(url = str_c("https://www.foreignaffairs.com/", url),
-                       article_number = row_number()) %>%
-                select(article_number, url)
+                       article_number = row_number())
         
         # create get_article_text_for_current_url()
         get_article_text_for_current_url <- function(current_url, current_article_number) {
